@@ -1,0 +1,304 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Page Title</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <meta name="viewport" content="width=device-width">
+    <style>
+        .club {
+            border: 1px solid black;
+            margin-top: 10px;
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .event {
+            border: 1px solid black;
+            margin-top: 10px;
+            padding: 10px;
+        }
+
+        tr, td {
+            padding: 10px;
+        }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script>
+        var selectedClubId = '';
+        $(document).ready(function () {
+            getAllClubs();
+        });
+        function getAllClubs() {
+            document.getElementById('input_search').value = null;
+            resetEvent();
+            $.ajax({
+                type: 'GET',
+                dataType: "json",
+                Headers: 'Access-Control-Allow-Origin: *',
+                url: 'https://localhost:7223/clubs',
+                success: function (data, status, xhr) {
+                    var listOfClub = document.getElementById('listOfClub');
+                    console.log(data);
+                    listOfClub.innerHTML = '';
+                    for (var i in data) {
+                        console.log(data[i]);
+                        listOfClub.innerHTML += showClub(data[i]);
+                    }
+
+                    var dialog = document.getElementById("createClubDialog");
+                    if (dialog.status = 'open') {
+                        closeClubModal();
+                    }
+                },
+                error: function (data, status, xhr) {
+                    console.log(status)
+                }
+            });
+        }
+
+        function onClubSelected(clubId) {
+            selectedClubId = clubId;
+            $.ajax({
+                type: 'GET',
+                dataType: "json",
+                Headers: 'Access-Control-Allow-Origin: *',
+                url: 'https://localhost:7223/clubs/' + clubId + '/events',
+                success: function (data, status, xhr) {
+                    var listOfEvent = document.getElementById('listOfEvent');
+                    for (var i in data) {
+                        listOfEvent.innerHTML = '';
+                        listOfEvent.innerHTML +=
+                            `
+                                                            <div class='event'>
+                                                                <p> Event name: ` + data[i].title + `</p>
+                                                                <p> Event description: ` + data[i].description + `</p>
+                                                                <p> Start Date: ` + data[i].startDate + `</p>
+                                                                <p> End Date: ` + (data[i].endDate != null ? data[i].endDate : '') + `</p>
+                                                            </div>
+                                                        `;
+                    }
+                },
+                error: function (data, status, xhr) {
+                    console.log(status);
+                    var listOfEvent = document.getElementById('listOfEvent');
+                    listOfEvent.innerHTML = `<h3 style='color: red'>No event</h3>`;
+                }
+            });
+        }
+
+        function searchClubs() {
+            var searchText = document.getElementById('input_search').value;
+            selectedClubId = null;
+            resetEvent();
+            $.ajax({
+                type: 'GET',
+                dataType: "json",
+                Headers: 'Access-Control-Allow-Origin: *',
+                url: 'https://localhost:7223/clubs/search=' + searchText,
+                success: function (data, status, xhr) {
+                    var listOfClub = document.getElementById('listOfClub');
+                    listOfClub.innerHTML = '';
+                    resetEvent();
+                    console.log(data);
+                    for (var i in data) {
+                        console.log(data[i]);
+                        listOfClub.innerHTML += showClub(data[i]);
+                    }
+                },
+                error: function (data, status, xhr) {
+                    console.log(status)
+                    var listOfClub = document.getElementById('listOfClub');
+                    listOfClub.innerHTML = `<h3 style='color: red'>No matching clubs</h3>`;
+                }
+            });
+        }
+
+        function showClub(data) {
+            return `<div class='club' onClick="onClubSelected('` + data.id + `')">
+                                            <p> Club name: ` + data.name + `</p>
+                                            <p> Club description: <br> &emsp;` + data.description + `</p>
+                                        </div>`
+        }
+
+        function openClubModal() {
+            var dialog = document.getElementById("createClubDialog");
+            dialog.showModal();
+            document.getElementById("newClubName").value = null;
+            document.getElementById("newClubDesc").value = null;
+        }
+
+        function openEventModal() {
+            if (selectedClubId) {
+                var dialog = document.getElementById("createEventDialog");
+                dialog.showModal();
+                document.getElementById("newEventTitle").value = null;
+                document.getElementById("newEventDesc").value = null;
+                document.getElementById("newEventStartDate").value = null;
+                document.getElementById("newEventEndDate").value = null;
+            } else
+                alert('Please select club');
+        }
+
+        function closeClubModal() {
+            var dialog = document.getElementById("createClubDialog");
+            dialog.close();
+        }
+
+        function closeEventModal() {
+            var dialog = document.getElementById("createEventDialog");
+            dialog.close();
+        }
+
+
+
+        function createEvent1() {
+            var newEventTitle = document.getElementById("newEventTitle").value;
+            if (!newEventTitle) {
+                alert("Event title is required.");
+                return;
+            }
+            var newEventDesc = document.getElementById("newEventDesc").value;
+            var newEventStartDate = document.getElementById("newEventStartDate").value;
+            var newEventEndDate = document.getElementById("newEventEndDate").value;
+            var addEventDto = {
+                title: newEventTitle,
+                description: newEventDesc,
+                StartDate: newEventStartDate,
+                EndDate: newEventEndDate == '' ? null : newEventEndDate,
+                ClubId: selectedClubId
+            };
+
+            $.ajax({
+                type: 'POST',
+                dataType: "json",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                url: 'https://localhost:7223/clubs/' + selectedClubId + '/events',
+                data: JSON.stringify(addEventDto),
+                success: function (data, status, xhr) {
+                    console.log(data);
+                    onClubSelected(selectedClubId);
+                    closeEventModal();
+                },
+                error: function (data, status, xhr) {
+                    console.log(status);
+                    alert('Please review the form');
+                }
+            });
+        }
+
+        function createClub() {
+            var newClubName = document.getElementById("newClubName").value;
+            if (!newClubName) {
+                alert("Club name is required.");
+                return;
+            }
+            var newClubDesc = document.getElementById("newClubDesc").value;
+            var clubDto = {
+                name: newClubName,
+                description: newClubDesc
+            };
+
+            $.ajax({
+                type: 'POST',
+                dataType: "json",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                url: 'https://localhost:7223/clubs',
+                data: JSON.stringify(clubDto),
+                success: function (data, status, xhr) {
+                    console.log(data);
+                    getAllClubs();
+                    closeClubModal();
+                },
+                error: function (data, status, xhr) {
+                    console.log(status);
+                    if (data.status = 409)
+                        alert("Duplicate club name.")
+                }
+            });
+        }
+
+        function resetEvent() {
+            var listOfEvent = document.getElementById('listOfEvent');
+            listOfEvent.innerHTML = '';
+        }
+    </script>
+</head>
+<body>
+
+    <h1>Clubs</h1>
+    <label> Search by name: </label>
+    <input placeholder="Input the club name" id="input_search" />
+    <button id="button_search" onclick="searchClubs()">Search</button>
+    <button id="button_reset" onclick="getAllClubs()">Reset</button>
+    <button id="button_create" style="float:right" onclick="openClubModal()">Create</button>
+    <div id="listOfClub"></div>
+    <div style="margin-top: 20px"></div>
+    <h2>Events: <button style="float:right; margin-top:10px" id="button_createEvent" onclick="openEventModal()">Create Event</button></h2>
+    <div id=listOfEvent></div>
+
+    <!-- pop-up dialog box, containing a form -->
+    <dialog id="createClubDialog">
+        <form method="dialog">
+            <p>
+                <h3>Create Club</h3>
+                <table>
+                    <tr>
+                        <td><label>Name *: </label></td>
+                        <td><input id="newClubName" /></td>
+                    </tr>
+                    <tr>
+                        <td><label>Description: </label></td>
+                        <td><input id="newClubDesc" /></td>
+                    </tr>
+                </table>
+
+                <br />
+
+            </p>
+            <div>
+                <button type="button" onclick="createClub()">Create</button>
+                <button id="cancel" style="float:right" onclick="closeClubModal()">Cancel</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="createEventDialog">
+        <form method="dialog">
+            <p>
+                <h3>Create Event</h3>
+                <table>
+                    <tr>
+                        <td><label>Title *: </label></td>
+                        <td><input id="newEventTitle" /></td>
+                    </tr>
+                    <tr>
+                        <td><label>Description: </label></td>
+                        <td><input id="newEventDesc" /></td>
+                    </tr>
+                    <tr>
+                        <td><label>Start Date*: </label></td>
+                        <td><input type="date" id="newEventStartDate" /></td>
+                    </tr>
+                    <tr>
+                        <td><label>End Date: </label></td>
+                        <td><input type="date" id="newEventEndDate" /></td>
+                    </tr>
+                </table>
+
+                <br />
+
+            </p>
+            <div>
+                <button type="button" onclick="createEvent1()">Create</button>
+                <button id="cancelEvent" style="float:right" onclick="closeEventModal()">Cancel</button>
+            </div>
+        </form>
+    </dialog>
+</body>
+</html>
